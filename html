@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#102438">
+<title>Bharat Runner 3D — Prototype</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#8bd5f6;font-family:system-ui,Arial;touch-action:none}
+#game{display:block;width:100vw;height:100vh}
+#hud{position:fixed;inset:0;pointer-events:none;color:#fff;text-shadow:0 2px 4px #000a}
+.top{display:flex;justify-content:space-between;padding:10px;gap:6px}.badge{padding:7px 10px;border-radius:13px;background:#092538d9;border:1px solid #ffffff55;font-weight:900;font-size:13px}
+#brand{position:absolute;top:9%;width:100%;text-align:center;font-weight:1000;font-size:clamp(25px,7vw,42px);color:#ffe66d;text-shadow:0 3px 0 #a5441c,0 6px 12px #0008}
+#tag{position:absolute;top:17%;width:100%;text-align:center;font-weight:800;font-size:13px}
+#panel{position:fixed;left:50%;top:54%;transform:translate(-50%,-50%);width:min(88vw,370px);padding:20px;border-radius:22px;background:#092538ef;color:white;text-align:center;border:1px solid #ffffff66;box-shadow:0 15px 45px #0007}
+#panel h2{color:#ffe66d;margin:0 0 8px}#panel p{font-size:14px;line-height:1.5;margin:8px 0 16px}
+button{width:100%;border:0;border-radius:14px;padding:14px;background:#ffd23f;color:#182533;font-size:17px;font-weight:1000;box-shadow:0 4px 0 #ad701a}
+#hint{position:fixed;bottom:9px;width:100%;text-align:center;color:#fff;font-size:12px;text-shadow:0 2px 4px #000;pointer-events:none}.hide{display:none}
+#loading{position:fixed;inset:0;display:grid;place-items:center;background:#102438;color:white;font-weight:800;z-index:10;text-align:center;padding:25px}
+</style>
+</head>
+<body>
+<div id="loading">Bharat Runner 3D लोड हो रहा है…<br><small>पहली बार इंटरनेट चाहिए</small></div>
+<div id="hud"><div class="top"><div class="badge">🪙 <span id="coins">0</span></div><div class="badge">दूरी <span id="dist">0</span> m</div><div class="badge" id="place">🇮🇳 गाँव</div></div><div id="brand">BHARAT RUNNER 3D</div><div id="tag">INDIAN ENDLESS RUN 🇮🇳</div></div>
+<div id="panel"><h2>🇮🇳 Bharat Runner 3D</h2><p>भारतीय लड़के के साथ रेलवे ट्रैक पर दौड़ो!<br>ट्रेनों से बचो और सिक्के इकट्ठा करो।</p><p>⬅️ ➡️ लेन बदलो &nbsp; ⬆️ जंप &nbsp; ⬇️ स्लाइड</p><button id="go">दौड़ शुरू करो ▶</button></div>
+<div id="hint">स्वाइप ← → लेन बदलें • ↑ जंप • ↓ स्लाइड</div>
+<script type="module">
+import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const loading=document.querySelector('#loading');
+try{
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x80d4ff);scene.fog=new THREE.Fog(0x9bd7e8,35,120);
+const camera=new THREE.PerspectiveCamera(65,innerWidth/innerHeight,.1,180);camera.position.set(0,5.2,9.5);
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,1.7));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.outputColorSpace=THREE.SRGBColorSpace;document.body.insertBefore(renderer.domElement,document.querySelector('#hud'));renderer.domElement.id='game';
+scene.add(new THREE.HemisphereLight(0xe3f7ff,0x4c6735,2));
+const sun=new THREE.DirectionalLight(0xfff0d0,2.3);sun.position.set(-7,15,8);sun.castShadow=true;scene.add(sun);
+const mat=(color,rough=.85,metal=0)=>new THREE.MeshStandardMaterial({color,roughness:rough,metalness:metal});
+const grass=mat(0x58a64b), dirt=mat(0x6c6a61), sleeper=mat(0x80694f), railmat=mat(0x9ba5a9,.35,.7), blue=mat(0x168bd1), skin=mat(0xc98551), hair=mat(0x25212a), pants=mat(0x202b40), shoe=mat(0xf4f2e8), gold=mat(0xffc928,.25,.55), red=mat(0xc84235), trainblue=mat(0x176f9a,.4,.2), windowmat=new THREE.MeshStandardMaterial({color:0xc9edff,metalness:.2,roughness:.2});
+function box(parent,w,h,d,material,x,y,z){let m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material);m.position.set(x,y,z);m.castShadow=true;m.receiveShadow=true;parent.add(m);return m}
+function sphere(parent,r,material,x,y,z){let m=new THREE.Mesh(new THREE.SphereGeometry(r,12,10),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+function cyl(parent,r1,r2,h,material,x,y,z,seg=12){let m=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,seg),material);m.position.set(x,y,z);m.castShadow=true;parent.add(m);return m}
+const ground=box(scene,100,.2,180,grass,0,-.22,-65);
+const track=box(scene,8,.12,180,dirt,0,-.08,-65);
+for(let lane=-1;lane<=1;lane++){let x=lane*1.45;let rail=box(scene,.13,.16,180,railmat,x,.05,-65);rail.position.x=x*1.2}
+const sleepers=[];for(let i=0;i<45;i++){let s=box(scene,7,.12,.24,sleeper,0,-.005,-i*4);sleepers.push(s)}
+// environment repeated roadside trees and simple village huts
+const scenery=[];
+for(let i=0;i<28;i++){for(let side of [-1,1]){
+ let z=-i*6-4,x=side*(5.3+(i%3)*.7);
+ let tree=new THREE.Group();tree.position.set(x,0,z);
+ cyl(tree,.16,.24,1.6,mat(0x765039),0,.8,0,8);
+ sphere(tree,.85,mat(i%2?0x26743d:0x328648),0,2,0);
+ sphere(tree,.55,mat(0x3a9148),-.35,2.25,.15);
+ scene.add(tree);scenery.push(tree);
+ if(i%4===0){let hut=new THREE.Group();hut.position.set(side*(8.2+(i%2)),0,z-2);box(hut,2,1.5,1.8,mat(0xe6c58b),0,.8,0);let roof= new THREE.Mesh(new THREE.ConeGeometry(1.65,.9,4),mat(0xa94b2b));roof.position.y=2;roof.rotation.y=Math.PI/4;hut.add(roof);scene.add(hut);scenery.push(hut)}
+}}
+function makeRunner(){let g=new THREE.Group();const torso=box(g,.72,1,.42,blue,0,1.55,0);const head=sphere(g,.29,skin,0,2.3,0);sphere(g,.3,hair,0,2.48,-.02);box(g,.5,.12,hair,0,2.42,.18);
+const armL=box(g,.2,.75,.22,skin,-.48,1.55,0),armR=box(g,.2,.75,.22,skin,.48,1.55,0);
+const legL=box(g,.27,.72,.3,pants,-.2,.65,0),legR=box(g,.27,.72,.3,pants,.2,.65,0);
+box(g,.32,.15,.42,shoe,-.2,.2,.06);box(g,.32,.15,.42,shoe,.2,.2,.06);
+g.userData={armL,armR,legL,legR,torso};g.position.set(0,0,3);scene.add(g);return g}
+const runner=makeRunner();
+function makeCoin(){let g=new THREE.Group();let m=new THREE.Mesh(new THREE.TorusGeometry(.28,.09,8,18),gold);m.rotation.y=Math.PI/2;g.add(m);let core=cyl(g,.19,.19,.06,gold,0,0,0,16);core.rotation.x=Math.PI/2;return g}
+function makeObstacle(type,lane,z){let g=new THREE.Group();g.position.set(lane*1.45,0,z);g.userData={type,lane,passed:false};
+if(type==='coin'){let c=makeCoin();c.position.y=1.1;g.add(c)}
+else if(type==='train'){box(g,2.25,2.7,5,trainblue,0,1.45,0);box(g,1.8,.7,.06,windowmat,0,2,2.53);box(g,1.8,.22,.08,mat(0xffc847),0,.45,2.55);for(let xx of [-.75,.75]){cyl(g,.32,.32,.16,mat(0x22252a),xx,.28,1.3,16).rotation.x=Math.PI/2;cyl(g,.32,.32,.16,mat(0x22252a),xx,.28,-1.4,16).rotation.x=Math.PI/2}}
+else if(type==='bar'){box(g,1.8,.45,.35,red,0,1.1,0);for(let xx of [-.7,.7])box(g,.16,1.1,.2,sleeper,xx,.55,0)}
+else {let m=new THREE.Mesh(new THREE.DodecahedronGeometry(.65,0),mat(0x858b8b));m.position.y=.55;m.castShadow=true;g.add(m)}
+scene.add(g);return g}
+let objects=[],spawn=0,dist=0,coins=0,lane=0,jump=0,slide=0,running=false,last=0,gameover=false,worldTime=0;
+function label(){return ['🇮🇳 गाँव','🏙️ शहर','🚉 स्टेशन'][Math.floor(dist/250)%3]}
+function spawnObj(){let lane=Math.floor(Math.random()*3)-1,type=Math.random()<.35?'coin':Math.random()<.52?'train':Math.random()<.5?'bar':'rock';objects.push(makeObstacle(type,lane,-78));if(Math.random()<.65)objects.push(makeObstacle('coin',Math.floor(Math.random()*3)-1,-84))}
+function start(){objects.forEach(o=>scene.remove(o));objects=[];lane=0;runner.position.x=0;dist=0;coins=0;jump=0;slide=0;spawn=0;running=true;gameover=false;document.querySelector('#panel').classList.add('hide');document.querySelector('#brand').classList.add('hide');document.querySelector('#tag').classList.add('hide');last=performance.now()}
+function end(){running=false;gameover=true;document.querySelector('#panel').classList.remove('hide');document.querySelector('#panel').innerHTML=`<h2>दौड़ खत्म! 🏁</h2><p>दूरी: <b>${Math.floor(dist)} मीटर</b><br>कॉइन्स: <b>${coins}</b></p><button id="go">फिर से खेलो ↻</button>`;document.querySelector('#go').onclick=start}
+function move(d){if(running)lane=Math.max(-1,Math.min(1,lane+d))}
+function doJump(){if(running&&jump<=0&&slide<=0)jump=.8}
+function doSlide(){if(running&&jump<=0)slide=.6}
+function animate(t){requestAnimationFrame(animate);let dt=Math.min((t-last)/1000,.04);last=t;worldTime=t*.001;
+if(running){dist+=dt*15;spawn-=dt;if(spawn<=0){spawnObj();spawn=Math.max(.42,.8-dist/18000)}jump=Math.max(0,jump-dt);slide=Math.max(0,slide-dt);
+runner.position.x+=(lane*1.45-runner.position.x)*Math.min(1,dt*12);runner.position.y=jump>0?Math.sin((1-jump/.8)*Math.PI)*1.7:0;
+const ud=runner.userData;let bob=Math.sin(t*.018)*.45;ud.legL.rotation.x=bob*(slide>0?0:1);ud.legR.rotation.x=-bob*(slide>0?0:1);ud.armL.rotation.x=-bob;ud.armR.rotation.x=bob;
+if(slide>0){runner.scale.y=.52;runner.position.y=0}else runner.scale.y=1;
+for(let o of objects){o.position.z+=dt*(19+Math.min(dist/400,9));if(o.userData.type==='coin'&&o.position.z>1.5&&o.position.z<4.3&&Math.abs(o.position.x-runner.position.x)<.75&&!o.userData.passed){coins++;o.userData.passed=true;o.visible=false}
+if(o.position.z>1.1&&o.position.z<3.7&&Math.abs(o.position.x-runner.position.x)<.9&&o.userData.type!=='coin'&&!o.userData.passed){let avoided=(o.userData.type==='bar'&&slide>0)||(o.userData.type!=='bar'&&jump>.15);if(!avoided){end();break}else o.userData.passed=true}}
+objects=objects.filter(o=>{if(o.position.z>8){scene.remove(o);return false}return true});
+for(let s of sleepers){s.position.z+=dt*20;if(s.position.z>5)s.position.z-=180}
+for(let s of scenery){s.position.z+=dt*12;if(s.position.z>10)s.position.z-=180}
+camera.position.x+=(runner.position.x*.35-camera.position.x)*dt*2;camera.lookAt(runner.position.x*.15,1.15,-4);
+document.querySelector('#coins').textContent=coins;document.querySelector('#dist').textContent=Math.floor(dist);document.querySelector('#place').textContent=label();
+}
+renderer.render(scene,camera)}
+document.querySelector('#go').onclick=start;
+let sx=0,sy=0;renderer.domElement.addEventListener('touchstart',e=>{sx=e.changedTouches[0].clientX;sy=e.changedTouches[0].clientY},{passive:false});renderer.domElement.addEventListener('touchend',e=>{e.preventDefault();let dx=e.changedTouches[0].clientX-sx,dy=e.changedTouches[0].clientY-sy;if(Math.max(Math.abs(dx),Math.abs(dy))<18)return;if(Math.abs(dx)>Math.abs(dy))move(dx>0?1:-1);else if(dy<0)doJump();else doSlide()},{passive:false});
+addEventListener('keydown',e=>{if(e.key==='ArrowLeft')move(-1);if(e.key==='ArrowRight')move(1);if(e.key==='ArrowUp'||e.key===' ')doJump();if(e.key==='ArrowDown')doSlide()});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+loading.remove();requestAnimationFrame(animate);
+}catch(e){loading.innerHTML='गेम लोड नहीं हुआ। इंटरनेट चालू करके दोबारा खोलें।<br><small>'+String(e)+'</small>'}
+</script></body></html>
